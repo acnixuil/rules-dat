@@ -25,8 +25,7 @@ jobs:
 
       - name: Convert all .list files to .mrs
         run: |
-          cd convert
-          go run ./ textfile -i ../ -o ../ -b domain
+          go run ./convert/textfile -i ../ -o ../ -b domain
 
       - name: Commit and push MRS files
         run: |
