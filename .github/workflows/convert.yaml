@@ -1,0 +1,43 @@
+name: Convert List Files to MRS
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 17 * * *"
+
+jobs:
+  convert_lists_to_mrs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout MetaCubeX/meta-rules-converter
+        uses: actions/checkout@v4
+        with:
+          repository: MetaCubeX/meta-rules-converter
+          ref: Alpha
+          path: convert
+          
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Convert all .list files to .mrs
+        run: |
+          for file in ./*.list; do
+            [ -e "$file" ] || continue
+            filename=$(basename "$file" .list)
+            go run ./ textfile -i "$file" -o "./${filename}.mrs" -b domain
+          done
+
+      - name: Commit and push MRS files
+        run: |
+          git config user.name "${{ secrets.GIT_USER_NAME }}"
+          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+          git add ./*.mrs
+          git commit -m "Converted list files to MRS format"
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
