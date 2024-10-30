@@ -26,11 +26,7 @@ jobs:
       - name: Convert all .list files to .mrs
         run: |
           cd convert
-          for file in ../*.list; do
-            [ -e "$file" ] || continue
-            filename=$(basename "$file" .list)
-            go run ./ textfile -i "$file" -o "../${filename}.mrs" -b domain
-          done
+          go run ./ textfile -i ../ -o ../ -b domain
 
       - name: Commit and push MRS files
         run: |
