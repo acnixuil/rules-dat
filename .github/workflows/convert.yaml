@@ -12,10 +12,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout MetaCubeX/meta-rules-converter
+      - name: Checkout ForestL18/meta-rules-converter
         uses: actions/checkout@v4
         with:
-          repository: MetaCubeX/meta-rules-converter
+          repository: ForestL18/meta-rules-converter
           path: convert
           
       - name: Set up Go
