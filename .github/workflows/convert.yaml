@@ -23,9 +23,12 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Convert all .list files to .mrs
+      - name: Run Conversion
         run: |
-          go run ./convert/textfile -i ../ -o ../ -b domain
+          cd convert
+          go mod init convert
+          go mod tidy
+          go run ./textfile -i ../ -o ../ -b domain
 
       - name: Commit and push MRS files
         run: |
