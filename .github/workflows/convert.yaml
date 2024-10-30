@@ -27,7 +27,7 @@ jobs:
         run: |
           cd convert
           ls -la  
-          go run ./textfile -i ../ -o ../ -b domain
+          go run ./ textfile -i ../ -o ../ -b domain
 
       - name: Commit and push MRS files
         run: |
