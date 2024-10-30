@@ -26,8 +26,6 @@ jobs:
       - name: Run Conversion
         run: |
           cd convert
-          go mod init convert
-          go mod tidy
           go run ./textfile -i ../ -o ../ -b domain
 
       - name: Commit and push MRS files
