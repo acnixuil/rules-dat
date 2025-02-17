@@ -55,8 +55,9 @@ jobs:
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
         git checkout mrs
-        git rm -f awavenue-ads.mrs || true
-        git checkout origin/main -- awavenue-ads.mrs
+        mv awavenue-ads.mrs mrs_files/
+        git rm -f awavenue-ads.mrs
+        mv mrs_files/awavenue-ads.mrs .
         git add awavenue-ads.mrs
         git commit -m "Move awavenue-ads.mrs to mrs branch"
         git push origin mrs --force
