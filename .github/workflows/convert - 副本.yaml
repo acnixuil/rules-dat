@@ -1,0 +1,62 @@
+name: Convert Mihomo Ruleset
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 22 * * 5'  # 每周五 UTC 22:00，即每周六中国时间 6:00
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget curl
+
+    - name: Download AWAvenue Ads Rule
+      run: |
+        wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
+        ls -a
+
+    - name: Install Mihomo
+      run: |
+        # 根据系统架构下载并安装 mihomo
+        case "$(uname -m)" in
+        'x86_64') ARCH='amd64' ;;
+        'x86' | 'i686' | 'i386') ARCH='386' ;;
+        'aarch64' | 'arm64') ARCH='arm64' ;;
+        'armv7l') ARCH='armv7' ;;
+        'riscv64') ARCH='riscv64' ;;
+        's390x') ARCH='s390x' ;;
+        *) ARCH='unknown' ;;
+        esac
+        echo "The architecture is: $ARCH"
+        if [ "$ARCH" != 'unknown' ]; then
+          MIHOMO_VER=$(wget -q -O - 'https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt')
+          MIHOMO_URL='https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-linux-'$ARCH'-'$MIHOMO_VER'.deb'
+          wget -q -O ./mihomo.deb "$MIHOMO_URL"
+          sudo apt-get install ./mihomo.deb
+          rm -f ./mihomo.deb
+        fi
+
+    - name: Compile Mihomo Ruleset
+      run: |
+        ls -a
+        mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./awavenue-ads.mrs
+
+    - name: Commit and push only .mrs files to mrs branch
+      run: |
+        git config user.name "${{ secrets.GIT_USER_NAME }}"
+        git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+        git fetch origin mrs || git checkout -B mrs
+        git rm -f awavenue-ads.mrs
+        git add ./awavenue-ads.mrs
+        git commit -m "Update awavenue-ads.mrs in mrs branch"
+        git push origin mrs --force
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
