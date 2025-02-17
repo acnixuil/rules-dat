@@ -33,8 +33,9 @@ jobs:
 
       - name: Run Conversion
         run: |
-          curl -L -o awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
+          wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
           ls -la
+          cat awavenue-ads.yaml
           cd convert
           go run ./ textfile -i ../ -o ../ -b domain
           realpath ../custom_reject.mrs 
