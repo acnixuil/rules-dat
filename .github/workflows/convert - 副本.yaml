@@ -54,6 +54,7 @@ jobs:
       run: |
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+        mkdir -p mrs_files
         mv awavenue-ads.mrs mrs_files/  # 移动文件到临时目录
         git checkout mrs
         git rm -f awavenue-ads.mrs || true  # 删除 mrs 分支下的文件
