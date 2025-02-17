@@ -2,6 +2,8 @@ name: Convert
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 22 * * 5'  # 每周五 UTC 22:00，即每周六中国时间 6:00
 
 jobs:
   convert:
@@ -31,8 +33,9 @@ jobs:
 
       - name: Run Conversion
         run: |
+          curl -L -o awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
           cd convert
-          ls -la  
+          # ls -la
           go run ./ textfile -i ../ -o ../ -b domain
           realpath ../custom_reject.mrs 
           ls ${{ github.workspace }} -l
