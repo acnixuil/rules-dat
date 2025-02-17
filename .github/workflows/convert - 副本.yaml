@@ -53,8 +53,9 @@ jobs:
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
         git fetch origin mrs
+        git fetch origin master
         git checkout mrs
-        git checkout master -- awavenue-ads.mrs
+        git checkout origin/master -- awavenue-ads.mrs
         mv awavenue-ads.mrs mrs_files/ || true
         git rm -f awavenue-ads.mrs
         mv mrs_files/* .
@@ -64,3 +65,4 @@ jobs:
         git push origin mrs --force
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
