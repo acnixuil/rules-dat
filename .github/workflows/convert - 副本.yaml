@@ -52,14 +52,11 @@ jobs:
       run: |
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
-        git fetch origin mrs
         git checkout mrs
-        git checkout origin/main -- awavenue-ads.mrs || exit 0
+        git rm -f awavenue-ads.mrs || true
+        git checkout origin/main -- awavenue-ads.mrs
         git add awavenue-ads.mrs
         git commit -m "Move awavenue-ads.mrs to mrs branch"
         git push origin mrs --force
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-
