@@ -21,7 +21,6 @@ jobs:
     - name: Download AWAvenue Ads Rule
       run: |
         wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
-        ls -a
 
     - name: Install Mihomo
       run: |
@@ -46,17 +45,21 @@ jobs:
 
     - name: Compile Mihomo Ruleset
       run: |
-        ls -a
         mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./awavenue-ads.mrs
+        ls -a
 
     - name: Commit and push only .mrs files to mrs branch
       run: |
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
-        git fetch origin mrs || git checkout -B mrs
+        git checkout mrs
+        git checkout master -- awavenue-ads.mrs
+        mv awavenue-ads.mrs mrs_files/ || true
         git rm -f awavenue-ads.mrs
-        git add ./awavenue-ads.mrs
-        git commit -m "Update awavenue-ads.mrs in mrs branch"
+        mv mrs_files/* .
+        rmdir mrs_files || true
+        git add awavenue-ads.mrs
+        git commit -m "Move awavenue-ads.mrs to mrs branch"
         git push origin mrs --force
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
