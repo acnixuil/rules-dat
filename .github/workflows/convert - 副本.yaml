@@ -52,6 +52,7 @@ jobs:
       run: |
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+        git fetch origin mrs
         git checkout mrs
         git checkout master -- awavenue-ads.mrs
         mv awavenue-ads.mrs mrs_files/ || true
