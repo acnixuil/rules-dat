@@ -48,26 +48,22 @@ jobs:
     - name: Compile Mihomo Ruleset
       run: |
         mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./awavenue-ads.mrs
-        ls -a
+        mihomo convert-ruleset domain txt ./custom_direct.list ./custom_direct.mrs
+        mihomo convert-ruleset domain txt ./custom_emby.list ./custom_emby.mrs
+        mihomo convert-ruleset domain txt ./custom_reject.list ./custom_reject.mrs
+        mkdir -p publish
+        mv *.mrs publish/
 
-    - name: Commit and push only .mrs files to mrs branch
-      run: |
-        git config user.name "${{ secrets.GIT_USER_NAME }}"
-        git config user.email "${{ secrets.GIT_USER_EMAIL }}"
-
-        mkdir -p /tmp/mrs_files
-        mv awavenue-ads.mrs /tmp/mrs_files/  # 先移动文件，避免 checkout 失败
-
-        git checkout mrs
-        git rm -f awavenue-ads.mrs || true
-        mv /tmp/mrs_files/awavenue-ads.mrs .
-
-        git add awavenue-ads.mrs
-        git commit -m "Move awavenue-ads.mrs to mrs branch" || echo "No changes to commit"
-        git push origin mrs --force
+    - name: "mrs and push"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-
-
+      run: |
+        cd publish
+        git init
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add .
+        git commit -m "Released on ${{ env.BUILDTIME }}"
+        git branch -M mrs
+        git remote add origin https://github-action:$GITHUB_TOKEN@github.com/acnixuil/rules-dat.git
+        git push -u origin mrs --force
