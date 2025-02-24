@@ -54,14 +54,20 @@ jobs:
       run: |
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
-        mv awavenue-ads.mrs ../awavenue-ads.mrs  # 移到仓库外
+        
+        cp awavenue-ads.mrs /tmp/awavenue-ads.mrs  # 复制到临时目录
         git checkout mrs
         git rm -f awavenue-ads.mrs || true
-        mv ../awavenue-ads.mrs .  # 取回文件
+        mv /tmp/awavenue-ads.mrs .  # 移回文件
+        
+        ls -l  # 确保文件存在
+        git status  # 检查 Git 是否追踪变化
+        
         git add awavenue-ads.mrs
         git commit -m "Move awavenue-ads.mrs to mrs branch" || echo "No changes to commit"
         git push origin mrs --force
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
