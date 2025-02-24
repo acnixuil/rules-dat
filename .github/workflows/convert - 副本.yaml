@@ -54,20 +54,20 @@ jobs:
       run: |
         git config user.name "${{ secrets.GIT_USER_NAME }}"
         git config user.email "${{ secrets.GIT_USER_EMAIL }}"
-        
-        cp awavenue-ads.mrs /tmp/awavenue-ads.mrs  # 复制到临时目录
+
+        mkdir -p /tmp/mrs_files
+        mv awavenue-ads.mrs /tmp/mrs_files/  # 先移动文件，避免 checkout 失败
+
         git checkout mrs
         git rm -f awavenue-ads.mrs || true
-        mv /tmp/awavenue-ads.mrs .  # 移回文件
-        
-        ls -l  # 确保文件存在
-        git status  # 检查 Git 是否追踪变化
-        
+        mv /tmp/mrs_files/awavenue-ads.mrs .
+
         git add awavenue-ads.mrs
         git commit -m "Move awavenue-ads.mrs to mrs branch" || echo "No changes to commit"
         git push origin mrs --force
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 
