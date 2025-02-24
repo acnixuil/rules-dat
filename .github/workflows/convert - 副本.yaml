@@ -48,9 +48,9 @@ jobs:
     - name: Compile Mihomo Ruleset
       run: |
         mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./awavenue-ads.mrs
-        mihomo convert-ruleset domain txt ./custom_direct.list ./custom_direct.mrs
-        mihomo convert-ruleset domain txt ./custom_emby.list ./custom_emby.mrs
-        mihomo convert-ruleset domain txt ./custom_reject.list ./custom_reject.mrs
+        mihomo convert-ruleset domain text ./custom_direct.list ./custom_direct.mrs
+        mihomo convert-ruleset domain text ./custom_emby.list ./custom_emby.mrs
+        mihomo convert-ruleset domain text ./custom_reject.list ./custom_reject.mrs
         mkdir -p publish
         mv *.mrs publish/
 
