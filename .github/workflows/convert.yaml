@@ -1,4 +1,4 @@
-name: Convert
+name: Convert Mihomo Ruleset
 
 on:
   workflow_dispatch:
@@ -8,59 +8,65 @@ on:
 jobs:
   convert:
     runs-on: ubuntu-latest
-    steps:    
-      - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: 0
-          keep_minimum_runs: 0
-          
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Checkout ForestL18/meta-rules-converter
-        uses: actions/checkout@v4
-        with:
-          repository: ForestL18/meta-rules-converter
-          path: convert
-          
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
+    steps:
+    - name: Set build time
+      run: echo "BUILDTIME=$(date +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+      
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Run Conversion
-        run: |
-          cd convert
-          go run ./ textfile -i ../ -o ../ -b domain
-          realpath ../custom_reject.mrs 
-          ls ${{ github.workspace }} -l
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget curl
 
-      # - name: Upload MRS files to GitHub Release
-      #   uses: ncipollo/release-action@v1
-      #   with:
-      #     artifacts: '${{ github.workspace }}/*.mrs'  # 替换为实际的文件路径
-      #     tag: 'mrs'  # 固定标签
-      #     replacesArtifacts: true
-      #     allowUpdates: true
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Download AWAvenue Ads Rule
+      run: |
+        wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
 
-      - name: Commit and push only .mrs files to mrs branch
-        run: |
-          git config user.name "${{ secrets.GIT_USER_NAME }}"
-          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
-          git checkout -B mrs  # 切换到 mrs 分支
-          # 移动 .mrs 文件到单独目录，避免误删
-          mkdir -p mrs_files
-          mv *.mrs mrs_files/
-          git rm -rf .         # 删除所有文件
-          mv mrs_files/* .     # 恢复 .mrs 文件到根目录
-          rmdir mrs_files
-          git add ./*.mrs      # 添加 .mrs 文件
-          git commit -m "Keep only .mrs files in mrs branch"
-          git push origin mrs --force  # 强制推送到 mrs 分支
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install Mihomo
+      run: |
+        # 根据系统架构下载并安装 mihomo
+        case "$(uname -m)" in
+        'x86_64') ARCH='amd64' ;;
+        'x86' | 'i686' | 'i386') ARCH='386' ;;
+        'aarch64' | 'arm64') ARCH='arm64' ;;
+        'armv7l') ARCH='armv7' ;;
+        'riscv64') ARCH='riscv64' ;;
+        's390x') ARCH='s390x' ;;
+        *) ARCH='unknown' ;;
+        esac
+        echo "The architecture is: $ARCH"
+        if [ "$ARCH" != 'unknown' ]; then
+          MIHOMO_VER=$(wget -q -O - 'https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt')
+          MIHOMO_URL='https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-linux-'$ARCH'-'$MIHOMO_VER'.deb'
+          wget -q -O ./mihomo.deb "$MIHOMO_URL"
+          sudo apt-get install ./mihomo.deb
+          rm -f ./mihomo.deb
+        fi
+
+    - name: Compile Mihomo Ruleset
+      run: |
+        mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./awavenue-ads.mrs
+        mihomo convert-ruleset domain text ./custom_direct.list ./custom_direct.mrs
+        mihomo convert-ruleset domain text ./custom_emby.list ./custom_emby.mrs
+        mihomo convert-ruleset domain text ./custom_reject.list ./custom_reject.mrs
+        mkdir -p publish
+        mv *.mrs publish/
+
+    - name: "mrs and push"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd publish
+        git init
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add .
+        git commit -m "Released on ${{ env.BUILDTIME }}"
+        git branch -M mrs
+        git remote add origin https://github-action:$GITHUB_TOKEN@github.com/acnixuil/rules-dat.git
+        git push -u origin mrs --force
