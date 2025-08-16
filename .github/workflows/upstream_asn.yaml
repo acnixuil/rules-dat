@@ -15,15 +15,21 @@ jobs:
           ref: mihomo
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fetch file from upstream
+      - name: Clean branch (keep .github only)
+        run: |
+          shopt -s extglob
+          rm -rf *
+
+      - name: Download target file
         run: |
           mkdir -p asn/combined
-          curl -sSL https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.mrs -o asn/combined/China-ASN-combined.mrs
+          curl -sSL https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.mrs \
+            -o asn/combined/China-ASN-combined.mrs
 
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add asn/combined/China-ASN-combined.mrs
+          git add -A
           git diff --cached --quiet || git commit -m "sync: update China-ASN-combined.mrs from upstream"
           git push origin HEAD:mihomo
