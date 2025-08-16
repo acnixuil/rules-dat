@@ -1,4 +1,4 @@
-name: Sync ASN .mrs to mihomo
+name: Sync ASN
 
 on:
   workflow_dispatch:
@@ -24,12 +24,13 @@ jobs:
           rm -rf asn
           mkdir -p asn
           cp upstream/asn/*.mrs asn/
+          rm -rf upstream   # 删除避免被 git add
 
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add asn
           git diff --cached --quiet || git commit -m "sync: update .mrs from upstream"
           git push origin mihomo
         env:
