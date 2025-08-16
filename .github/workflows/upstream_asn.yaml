@@ -15,9 +15,9 @@ jobs:
           ref: mihomo
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Clean branch except target file
+      - name: Clean branch except target file and .git
         run: |
-          find . -mindepth 1 ! -path "./asn/combined/China-ASN-combined.mrs" -exec rm -rf {} +
+          find . -mindepth 1 ! -path "./.git*" ! -path "./asn/combined/China-ASN-combined.mrs" -exec rm -rf {} +
 
       - name: Download target file safely
         run: |
