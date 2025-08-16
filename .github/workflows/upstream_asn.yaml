@@ -1,4 +1,4 @@
-name: Sync ASN
+name: Sync China-ASN-combined.mrs
 
 on:
   workflow_dispatch:
@@ -15,21 +15,15 @@ jobs:
           ref: mihomo
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Clone upstream
+      - name: Fetch file from upstream
         run: |
-          git clone --depth=1 --branch=mihomo https://github.com/ForestL18/rules-dat upstream
-
-      - name: Copy .mrs files
-        run: |
-          rm -rf asn
-          mkdir -p asn
-          cp upstream/asn/*.mrs asn/
-          rm -rf upstream
+          mkdir -p asn/combined
+          curl -sSL https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.mrs -o asn/combined/China-ASN-combined.mrs
 
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add asn
-          git diff --cached --quiet || git commit -m "sync: update .mrs from upstream"
+          git add asn/combined/China-ASN-combined.mrs
+          git diff --cached --quiet || git commit -m "sync: update China-ASN-combined.mrs from upstream"
           git push origin HEAD:mihomo
