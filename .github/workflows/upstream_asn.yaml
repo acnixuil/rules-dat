@@ -15,16 +15,20 @@ jobs:
           ref: mihomo
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Clean branch (keep .github only)
+      - name: Clean branch except target file
         run: |
-          shopt -s extglob
-          rm -rf *
+          find . -mindepth 1 ! -path "./asn/combined/China-ASN-combined.mrs" -exec rm -rf {} +
 
-      - name: Download target file
+      - name: Download target file safely
         run: |
           mkdir -p asn/combined
-          curl -sSL https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.mrs \
-            -o asn/combined/China-ASN-combined.mrs
+          curl -sfSL https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.mrs -o tmp.mrs
+          if [ -s tmp.mrs ]; then
+              mv tmp.mrs asn/combined/China-ASN-combined.mrs
+          else
+              echo "Upstream file not found, skip update"
+              rm -f tmp.mrs
+          fi
 
       - name: Commit changes
         run: |
