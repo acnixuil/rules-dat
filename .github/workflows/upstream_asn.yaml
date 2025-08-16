@@ -34,6 +34,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 获取上游 mihomo 分支最新 commit hash
+          UPSTREAM_HASH=$(git ls-remote https://github.com/ForestL18/rules-dat.git mihomo | cut -f1)
           git add -A
-          git diff --cached --quiet || git commit -m "sync: update China-ASN-combined.mrs from upstream"
+          git diff --cached --quiet || git commit -m "sync: update China-ASN-combined.mrs from upstream @ $UPSTREAM_HASH"
           git push origin HEAD:mihomo
