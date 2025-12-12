@@ -67,10 +67,6 @@ jobs:
         wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
         mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./publish_mrs/awavenue-ads.mrs
 
-        # 2. Sing-box: 直接下载官方 SRS
-        # 注意：这里使用了该仓库的标准 SRS 地址，如果地址有变请自行替换
-        wget -O ./publish_srs/awavenue-ads.srs https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule.srs
-
     - name: Process Custom Lists (Both Cores)
       run: |
         # 1. Mihomo: 直接转换 Text -> MRS
