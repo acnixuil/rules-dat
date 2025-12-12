@@ -1,72 +1,134 @@
-name: Convert Mihomo Ruleset
+name: Convert Ruleset (Mihomo & Sing-box)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 22 * * 5'  # 每周五 UTC 22:00，即每周六中国时间 6:00
+    - cron: '0 22 * * 5'  # UTC 22:00 (北京时间周六 6:00)
 
 jobs:
   convert:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Set build time
-      run: echo "BUILDTIME=$(date -u -d '+8 hours' +'%Y-%m-%d_%H-%M-%S')" >> $GITHUB_ENV
+      run: echo "BUILDTIME=$(date -u -d '+8 hours' +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
       
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y wget curl
+        pip install pyyaml
+        sudo apt-get update && sudo apt-get install -y wget curl
 
-    - name: Download AWAvenue Ads Rule
+    - name: Download Cores (Mihomo & Sing-box)
       run: |
+        # 1. 下载 Mihomo (Alpha)
+        MIHOMO_VER=$(curl -s https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt)
+        wget -O mihomo.gz "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-linux-amd64-${MIHOMO_VER}.gz"
+        gunzip mihomo.gz && chmod +x mihomo && sudo mv mihomo /usr/local/bin/
+
+        # 2. 下载 Sing-box (Release)
+        SB_VER=$(curl -s "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+        echo "Sing-box version: $SB_VER"
+        wget -O sing-box.deb "https://github.com/SagerNet/sing-box/releases/download/v${SB_VER}/sing-box_${SB_VER}_linux_amd64.deb"
+        sudo dpkg -i sing-box.deb
+        rm sing-box.deb
+
+    - name: Prepare Directories
+      run: |
+        mkdir -p publish_mrs
+        mkdir -p publish_srs
+        mkdir -p temp_json
+
+    - name: Process AWAvenue-Ads Rule
+      run: |
+        # 1. Mihomo: 下载 YAML 并转换为 MRS
         wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
+        mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./publish_mrs/awavenue-ads.mrs
 
-    - name: Install Mihomo
-      run: |
-        # 根据系统架构下载并安装 mihomo
-        case "$(uname -m)" in
-        'x86_64') ARCH='amd64' ;;
-        'x86' | 'i686' | 'i386') ARCH='386' ;;
-        'aarch64' | 'arm64') ARCH='arm64' ;;
-        'armv7l') ARCH='armv7' ;;
-        'riscv64') ARCH='riscv64' ;;
-        's390x') ARCH='s390x' ;;
-        *) ARCH='unknown' ;;
-        esac
-        echo "The architecture is: $ARCH"
-        if [ "$ARCH" != 'unknown' ]; then
-          MIHOMO_VER=$(wget -q -O - 'https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt')
-          MIHOMO_URL='https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-linux-'$ARCH'-'$MIHOMO_VER'.deb'
-          wget -q -O ./mihomo.deb "$MIHOMO_URL"
-          sudo apt-get install ./mihomo.deb
-          rm -f ./mihomo.deb
-        fi
+        # 2. Sing-box: 直接下载官方 SRS
+        # 注意：这里使用了该仓库的标准 SRS 地址，如果地址有变请自行替换
+        wget -O ./publish_srs/awavenue-ads.srs https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule.srs
 
-    - name: Compile Mihomo Ruleset
+    - name: Process Custom Lists (Both Cores)
       run: |
-        mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./awavenue-ads.mrs
-        mihomo convert-ruleset domain text ./custom_direct.list ./custom_direct.mrs
-        mihomo convert-ruleset domain text ./custom_emby.list ./custom_emby.mrs
-        mihomo convert-ruleset domain text ./custom_reject.list ./custom_reject.mrs
-        mkdir -p publish
-        mv *.mrs publish/
+        # 1. Mihomo: 直接转换 Text -> MRS
+        for file in custom_direct.list custom_emby.list custom_reject.list; do
+          if [ -f "$file" ]; then
+            filename=$(basename "$file" .list)
+            mihomo convert-ruleset domain text "./$file" "./publish_mrs/$filename.mrs"
+          fi
+        done
 
-    - name: "mrs and push"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # 2. Sing-box: Python (Text->JSON) -> Compile (JSON->SRS)
+        python3 <<EOF
+        import json
+        import os
+        import glob
+
+        def save_json(data, filename):
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+        # 只处理本地 List 文件
+        for list_file in glob.glob('*.list'):
+            with open(list_file, 'r', encoding='utf-8') as f:
+                # 过滤空行和注释
+                domains = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                
+            if domains:
+                filename = os.path.splitext(os.path.basename(list_file))[0]
+                srs_data = {
+                    "version": 1,
+                    "rules": [{"domain_suffix": domains}]
+                }
+                save_json(srs_data, f'temp_json/{filename}.json')
+        EOF
+
+        # 编译生成的 JSON 为 SRS
+        for json_file in temp_json/*.json; do
+          # 检查是否有文件（防止报错）
+          [ -e "$json_file" ] || continue
+          
+          filename=$(basename "$json_file" .json)
+          echo "Compiling $filename..."
+          sing-box rule-set compile --output "publish_srs/$filename.srs" "$json_file"
+        done
+
+    - name: Push to 'mrs' branch
       run: |
-        cd publish
+        cd publish_mrs
+        [ -z "$(ls -A)" ] && touch .keep
+        
         git init
         git config --local user.name "github-actions[bot]"
         git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b mrs
         git add .
-        git commit -m "Released on ${{ env.BUILDTIME }}"
-        git branch -M mrs
-        git remote add origin https://github-action:$GITHUB_TOKEN@github.com/acnixuil/rules-dat.git
+        git commit -m "Mihomo Rules: ${{ env.BUILDTIME }}"
+        git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
         git push -u origin mrs --force
+
+    - name: Push to 'singbox' branch
+      run: |
+        cd publish_srs
+        [ -z "$(ls -A)" ] && touch .keep
+        
+        git init
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b singbox
+        git add .
+        git commit -m "Sing-box Rules: ${{ env.BUILDTIME }}"
+        git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+        git push -u origin singbox --force
