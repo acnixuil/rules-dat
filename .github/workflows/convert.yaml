@@ -32,15 +32,26 @@ jobs:
 
     - name: Download Cores (Mihomo & Sing-box)
       run: |
-        # 1. 下载 Mihomo (Alpha)
-        MIHOMO_VER=$(curl -s https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt)
-        wget -O mihomo.gz "https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/mihomo-linux-amd64-${MIHOMO_VER}.gz"
-        gunzip mihomo.gz && chmod +x mihomo && sudo mv mihomo /usr/local/bin/
+        # --- 1. 下载 Mihomo (Latest Stable) ---
+        # 使用 GitHub API 获取最新正式版版本号 (例如 v1.18.5)
+        MIHOMO_VER=$(curl -s "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        echo "Mihomo version: $MIHOMO_VER"
+        
+        # 下载正式版 (文件名通常为 mihomo-linux-amd64-v1.18.5.gz)
+        wget -O mihomo.gz "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VER}/mihomo-linux-amd64-${MIHOMO_VER}.gz"
+        
+        # 解压并安装
+        gunzip mihomo.gz
+        chmod +x mihomo
+        sudo mv mihomo /usr/local/bin/
 
-        # 2. 下载 Sing-box (Release)
-        SB_VER=$(curl -s "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
-        echo "Sing-box version: $SB_VER"
-        wget -O sing-box.deb "https://github.com/SagerNet/sing-box/releases/download/v${SB_VER}/sing-box_${SB_VER}_linux_amd64.deb"
+        # --- 2. 下载 Sing-box (Latest Release) ---
+        # 获取最新版本号 (去除 v 前缀，因为 singbox deb 包名不带 v)
+        SB_TAG=$(curl -s "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+        echo "Sing-box version: $SB_TAG"
+        
+        # 下载 (注意 release URL 中使用的是带 v 的 tag，但文件名里没有 v)
+        wget -O sing-box.deb "https://github.com/SagerNet/sing-box/releases/download/v${SB_TAG}/sing-box_${SB_TAG}_linux_amd64.deb"
         sudo dpkg -i sing-box.deb
         rm sing-box.deb
 
