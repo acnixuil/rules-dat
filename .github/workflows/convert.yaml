@@ -27,30 +27,17 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install pyyaml
         sudo apt-get update && sudo apt-get install -y wget curl
 
     - name: Download Cores (Mihomo & Sing-box)
       run: |
-        # --- 1. 下载 Mihomo (Latest Stable) ---
-        # 使用 GitHub API 获取最新正式版版本号 (例如 v1.18.5)
+        # 1. Mihomo (Latest Stable)
         MIHOMO_VER=$(curl -s "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        echo "Mihomo version: $MIHOMO_VER"
-        
-        # 下载正式版 (文件名通常为 mihomo-linux-amd64-v1.18.5.gz)
         wget -O mihomo.gz "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VER}/mihomo-linux-amd64-${MIHOMO_VER}.gz"
-        
-        # 解压并安装
-        gunzip mihomo.gz
-        chmod +x mihomo
-        sudo mv mihomo /usr/local/bin/
+        gunzip mihomo.gz && chmod +x mihomo && sudo mv mihomo /usr/local/bin/
 
-        # --- 2. 下载 Sing-box (Latest Release) ---
-        # 获取最新版本号 (去除 v 前缀，因为 singbox deb 包名不带 v)
+        # 2. Sing-box (Latest Release)
         SB_TAG=$(curl -s "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
-        echo "Sing-box version: $SB_TAG"
-        
-        # 下载 (注意 release URL 中使用的是带 v 的 tag，但文件名里没有 v)
         wget -O sing-box.deb "https://github.com/SagerNet/sing-box/releases/download/v${SB_TAG}/sing-box_${SB_TAG}_linux_amd64.deb"
         sudo dpkg -i sing-box.deb
         rm sing-box.deb
@@ -61,15 +48,20 @@ jobs:
         mkdir -p publish_srs
         mkdir -p temp_json
 
-    - name: Process AWAvenue-Ads Rule
+    - name: Download Rules
       run: |
-        # 1. Mihomo: 下载 YAML 并转换为 MRS
+        # 1. AWAvenue Ads (用于转 MRS)
         wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
+        
+        # 2. China ASN (内容其实是 IP CIDR，用于转 SRS)
+        wget -O ChinaASN.list https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.list
+
+    - name: Convert for Mihomo (.mrs)
+      run: |
+        # 1. AWAvenue
         mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./publish_mrs/awavenue-ads.mrs
 
-    - name: Process Custom Lists (Both Cores)
-      run: |
-        # 1. Mihomo: 直接转换 Text -> MRS
+        # 2. Custom Domain Lists
         for file in custom_direct.list custom_emby.list custom_reject.list; do
           if [ -f "$file" ]; then
             filename=$(basename "$file" .list)
@@ -77,36 +69,53 @@ jobs:
           fi
         done
 
-        # 2. Sing-box: Python (Text->JSON) -> Compile (JSON->SRS)
+    - name: Convert for Sing-box (.srs)
+      run: |
+        # 使用 Python 显式生成 JSON
         python3 <<EOF
         import json
         import os
-        import glob
 
         def save_json(data, filename):
             with open(filename, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
-        # 只处理本地 List 文件
-        for list_file in glob.glob('*.list'):
-            with open(list_file, 'r', encoding='utf-8') as f:
-                # 过滤空行和注释
-                domains = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-                
-            if domains:
-                filename = os.path.splitext(os.path.basename(list_file))[0]
+        # --- 任务 1: 处理 ChinaASN (内容为 IP CIDR) ---
+        if os.path.exists('ChinaASN.list'):
+            with open('ChinaASN.list', 'r', encoding='utf-8') as f:
+                # 直接读取行，不需要去头去尾，因为文件里全是干净的 CIDR
+                cidrs = [line.strip() for line in f if line.strip()]
+            
+            if cidrs:
+                # 关键点：这里使用 ip_cidr 字段，而不是 ip_asn
                 srs_data = {
                     "version": 1,
-                    "rules": [{"domain_suffix": domains}]
+                    "rules": [{"ip_cidr": cidrs}]
                 }
-                save_json(srs_data, f'temp_json/{filename}.json')
+                save_json(srs_data, 'temp_json/ChinaASN.json')
+                print("Generated JSON for ChinaASN (ip_cidr)")
+
+        # --- 任务 2: 处理 Custom Lists (内容为 域名) ---
+        custom_files = ['custom_direct.list', 'custom_emby.list', 'custom_reject.list']
+        for list_file in custom_files:
+            if os.path.exists(list_file):
+                with open(list_file, 'r', encoding='utf-8') as f:
+                    domains = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                
+                if domains:
+                    filename = os.path.splitext(os.path.basename(list_file))[0]
+                    # 关键点：这里使用 domain_suffix 字段
+                    srs_data = {
+                        "version": 1,
+                        "rules": [{"domain_suffix": domains}]
+                    }
+                    save_json(srs_data, f'temp_json/{filename}.json')
+                    print(f"Generated JSON for {list_file} (domain_suffix)")
         EOF
 
-        # 编译生成的 JSON 为 SRS
+        # 编译所有 JSON
         for json_file in temp_json/*.json; do
-          # 检查是否有文件（防止报错）
           [ -e "$json_file" ] || continue
-          
           filename=$(basename "$json_file" .json)
           echo "Compiling $filename..."
           sing-box rule-set compile --output "publish_srs/$filename.srs" "$json_file"
