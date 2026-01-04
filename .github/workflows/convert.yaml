@@ -50,18 +50,15 @@ jobs:
 
     - name: Download Rules
       run: |
-        # 1. AWAvenue Ads (用于转 MRS)
-        wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
-        
-        # 2. China ASN (内容其实是 IP CIDR，用于转 SRS)
-        wget -O ChinaASN.list https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.list
+        wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yam
+        wget -O ChinaASN.list https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.list  
+        wget -O cn.txt https://raw.githubusercontent.com/nekolsd/not-sing-geosite/release/clash/cn.txt
 
     - name: Convert for Mihomo (.mrs)
       run: |
-        # 1. AWAvenue
         mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./publish_mrs/awavenue-ads.mrs
+        mihomo convert-ruleset domain yaml ./cn.txt ./publish_mrs/cn.mrs
 
-        # 2. Custom Domain Lists
         for file in custom_direct.list custom_emby.list custom_reject.list; do
           if [ -f "$file" ]; then
             filename=$(basename "$file" .list)
