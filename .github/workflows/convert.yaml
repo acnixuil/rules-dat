@@ -50,7 +50,7 @@ jobs:
 
     - name: Download Rules
       run: |
-        wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yam
+        wget -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
         wget -O ChinaASN.list https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.list  
         wget -O cn.txt https://raw.githubusercontent.com/nekolsd/not-sing-geosite/release/clash/cn.txt
 
