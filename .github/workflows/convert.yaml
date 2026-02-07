@@ -1,0 +1,170 @@
+name: Convert Ruleset (Mihomo & Sing-box)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 22 * * 5'  # UTC 22:00 = 北京时间周六 06:00
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Set Environment & Time
+      run: echo "BUILDTIME=$(date -u -d '+8 hours' +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+      
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -y wget curl
+
+    - name: Download Core Tools
+      run: |
+        # 1. Download Mihomo
+        MIHOMO_VER=$(curl -s "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        wget -q -O mihomo.gz "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VER}/mihomo-linux-amd64-${MIHOMO_VER}.gz"
+        gunzip mihomo.gz && chmod +x mihomo && sudo mv mihomo /usr/local/bin/
+
+        # 2. Download Sing-box
+        SB_TAG=$(curl -s "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+        wget -q -O sing-box.deb "https://github.com/SagerNet/sing-box/releases/download/v${SB_TAG}/sing-box_${SB_TAG}_linux_amd64.deb"
+        sudo dpkg -i sing-box.deb && rm sing-box.deb
+
+    - name: Prepare Directories
+      run: mkdir -p publish_mihomo publish_singbox temp_json
+
+    - name: Download Source Rules
+      run: |
+        # 下载源文件
+        wget -q -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
+        wget -q -O ChinaASN.list https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.list   
+        wget -q -O cn.txt https://raw.githubusercontent.com/nekolsd/not-sing-geosite/release/clash/cn.txt
+
+    # ==========================================
+    # 任务 1: Mihomo 格式转换 -> 存入 publish_mihomo
+    # ==========================================
+    - name: Convert for Mihomo (.mrs)
+      run: |
+        echo "Converting standard rules..."
+        mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./publish_mihomo/awavenue-ads.mrs
+        
+        # [改名] cn.txt -> cn_domain.mrs
+        mihomo convert-ruleset domain yaml ./cn.txt ./publish_mihomo/cn_domain.mrs
+        
+        # [改名] ChinaASN -> cn_ip.mrs
+        mihomo convert-ruleset ipcidr text ./ChinaASN.list ./publish_mihomo/cn_ip.mrs
+
+        echo "Converting custom rules..."
+        for file in custom_direct.list custom_emby.list custom_reject.list; do
+          if [ -f "$file" ]; then
+            filename=$(basename "$file" .list)
+            mihomo convert-ruleset domain text "./$file" "./publish_mihomo/$filename.mrs"
+          fi
+        done
+
+    # ==========================================
+    # 任务 2: Sing-box 格式转换 -> 存入 publish_singbox
+    # ==========================================
+    - name: Convert for Sing-box (.srs)
+      run: |
+        python3 <<EOF
+        import json
+        import os
+
+        def save_json(data, filename):
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+        # 处理 ChinaASN (IP CIDR) -> 改名为 cn_ip.json
+        if os.path.exists('ChinaASN.list'):
+            with open('ChinaASN.list', 'r', encoding='utf-8') as f:
+                cidrs = [line.strip() for line in f if line.strip()]
+            if cidrs:
+                srs_data = { "version": 1, "rules": [{"ip_cidr": cidrs}] }
+                save_json(srs_data, 'temp_json/cn_ip.json') # 输出文件名改为 cn_ip
+
+        # 处理 Custom Lists (Domain Suffix)
+        custom_files = ['custom_direct.list', 'custom_emby.list', 'custom_reject.list']
+        for list_file in custom_files:
+            if os.path.exists(list_file):
+                with open(list_file, 'r', encoding='utf-8') as f:
+                    domains = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                if domains:
+                    filename = os.path.splitext(os.path.basename(list_file))[0]
+                    srs_data = { "version": 1, "rules": [{"domain_suffix": domains}] }
+                    save_json(srs_data, f'temp_json/{filename}.json')
+        EOF
+
+        for json_file in temp_json/*.json; do
+          [ -e "$json_file" ] || continue
+          filename=$(basename "$json_file" .json)
+          # 这里会自动生成 cn_ip.srs (因为上面保存的是 cn_ip.json)
+          sing-box rule-set compile --output "publish_singbox/$filename.srs" "$json_file"
+        done
+
+    # ==========================================
+    # 推送部分
+    # ==========================================
+    - name: Push to 'mihomo' branch
+      run: |
+        cd publish_mihomo
+        [ -z "$(ls -A)" ] && touch .keep
+        git init
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b mihomo
+        git add .
+        git commit -m "Mihomo Rules: ${{ env.BUILDTIME }}"
+        git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+        git push -u origin mihomo --force
+
+    - name: Push to 'singbox' branch
+      run: |
+        cd publish_singbox
+        [ -z "$(ls -A)" ] && touch .keep
+        git init
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b singbox
+        git add .
+        git commit -m "Sing-box Rules: ${{ env.BUILDTIME }}"
+        git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+        git push -u origin singbox --force
+
+    # ==========================================
+    # 通知部分
+    # ==========================================
+    - name: Telegram Notification
+      if: success()
+      run: |
+        # 这里的名字和文件名对应了
+        RULES="AWAvenue, cn_domain, cn_ip"
+        
+        [ -f "custom_direct.list" ] && RULES="$RULES, Direct"
+        [ -f "custom_emby.list" ] && RULES="$RULES, Emby"
+        [ -f "custom_reject.list" ] && RULES="$RULES, Reject"
+
+        MSG="<b>✅ 规则转换完成</b>
+        
+        <b>更新时间:</b> ${{ env.BUILDTIME }}
+        <b>更新列表:</b> $RULES"
+
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+          -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+          -d "parse_mode=HTML" \
+          -d "disable_web_page_preview=true" \
+          --data-urlencode "text=$MSG"
