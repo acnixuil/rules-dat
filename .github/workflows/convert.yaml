@@ -7,12 +7,14 @@ on:
   push:
     branches:
       - 'main'
-
+      
+permissions:
+  contents: write
+  actions: write
+  
 jobs:
   convert:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
     - name: Set Environment & Time
