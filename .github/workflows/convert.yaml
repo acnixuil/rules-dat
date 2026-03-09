@@ -1,4 +1,4 @@
-name: Convert Ruleset (Mihomo & Sing-box)
+name: Convert Ruleset
 
 on:
   workflow_dispatch:
@@ -168,3 +168,16 @@ jobs:
           -d "parse_mode=HTML" \
           -d "disable_web_page_preview=true" \
           --data-urlencode "text=$MSG"
+          
+            
+    - name: Delete workflow runs
+      if: always()
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 0
+        keep_minimum_runs: 1
+        delete_workflow_pattern: "${{ github.workflow }}"
+        delete_workflow_by_state_pattern: "active"
+        delete_run_by_conclusion_pattern: "success, failure, cancelled, skipped"
