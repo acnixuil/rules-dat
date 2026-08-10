@@ -54,7 +54,7 @@ jobs:
         # 下载源文件
         wget -q -O awavenue-ads.yaml https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml
         wget -q -O ChinaASN.list https://raw.githubusercontent.com/ForestL18/rules-dat/mihomo/asn/combined/China-ASN-combined.list   
-        wget -q -O cn.txt https://raw.githubusercontent.com/nekolsd/not-sing-geosite/release/clash/cn.txt
+        wget -q -O cn.txt https://raw.githubusercontent.com/nekolsd/sing-geosite/domain-set/cn.txt
 
     # ==========================================
     # 任务 1: Mihomo 格式转换 -> 存入 publish_mihomo
