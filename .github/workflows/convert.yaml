@@ -45,7 +45,7 @@ jobs:
 
     - name: Convert for Mihomo (.mrs)
       run: |
-        mihomo convert-ruleset classical yaml ./awavenue-ads.yaml ./publish_mihomo/awavenue-ads.mrs
+        mihomo convert-ruleset domain yaml ./awavenue-ads.yaml ./publish_mihomo/awavenue-ads.mrs
         mihomo convert-ruleset domain text ./cn.txt ./publish_mihomo/cn_domain.mrs
         mihomo convert-ruleset ipcidr text ./ChinaASN.list ./publish_mihomo/cn_ip.mrs
 
